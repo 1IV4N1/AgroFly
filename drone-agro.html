@@ -1,0 +1,1522 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>AgroFly — Control de Drones Agrícolas</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=DM+Sans:ital,wght@0,300;0,500;0,700;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050d08;
+    --bg2: #0a1a10;
+    --bg3: #0f2318;
+    --green: #1aff7a;
+    --green2: #0dcc60;
+    --green3: #07a34c;
+    --green-dim: rgba(26,255,122,0.12);
+    --green-glow: rgba(26,255,122,0.35);
+    --amber: #ffb830;
+    --red: #ff4444;
+    --text: #e8f5ee;
+    --text-muted: #6aab82;
+    --border: rgba(26,255,122,0.18);
+    --card: rgba(10,26,16,0.85);
+    --radius: 16px;
+    --radius-sm: 10px;
+    --font-mono: 'Space Mono', monospace;
+    --font-body: 'DM Sans', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-body);
+    min-height: 100dvh;
+    overflow: hidden;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+
+  /* ─── MOBILE SHELL ─── */
+  .shell {
+    width: 100%;
+    max-width: 430px;
+    height: 100dvh;
+    max-height: 926px;
+    background: var(--bg);
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 0 80px rgba(26,255,122,0.08);
+  }
+
+  /* ─── STATUS BAR ─── */
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px 6px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    z-index: 100;
+  }
+  .status-bar .signal {
+    display: flex; gap: 4px; align-items: flex-end;
+  }
+  .signal-bar { width: 3px; background: var(--green); border-radius: 1px; }
+  .signal-bar:nth-child(1) { height: 5px; }
+  .signal-bar:nth-child(2) { height: 8px; }
+  .signal-bar:nth-child(3) { height: 11px; }
+  .signal-bar:nth-child(4) { height: 14px; opacity: 0.4; }
+
+  /* ─── SCREENS ─── */
+  .screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.5s ease;
+    z-index: 1;
+  }
+  .screen.active {
+    opacity: 1;
+    pointer-events: all;
+    z-index: 10;
+  }
+
+  /* ══════════════════════════════════════
+     PANTALLA 1 — INICIO
+  ══════════════════════════════════════ */
+  #screen-home {
+    justify-content: flex-end;
+    padding: 0 0 48px;
+  }
+
+  .home-bg {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+  }
+  .home-bg canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .home-glow {
+    position: absolute;
+    width: 340px; height: 340px;
+    background: radial-gradient(circle, rgba(26,255,122,0.18) 0%, transparent 70%);
+    top: 50%; left: 50%;
+    transform: translate(-50%, -60%);
+    animation: pulse-glow 4s ease-in-out infinite;
+  }
+  @keyframes pulse-glow {
+    0%,100% { opacity: 0.7; transform: translate(-50%,-60%) scale(1); }
+    50% { opacity: 1; transform: translate(-50%,-60%) scale(1.08); }
+  }
+
+  .drone-hero {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -62%);
+    font-size: 72px;
+    filter: drop-shadow(0 0 24px var(--green));
+    animation: drone-float 3s ease-in-out infinite;
+  }
+  @keyframes drone-float {
+    0%,100% { transform: translate(-50%,-62%) translateY(0); }
+    50% { transform: translate(-50%,-62%) translateY(-14px); }
+  }
+
+  .drone-rings {
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -62%);
+    width: 140px; height: 140px;
+    margin-top: -4px;
+  }
+  .ring {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 1px solid var(--green);
+    animation: expand-ring 3s ease-out infinite;
+    opacity: 0;
+  }
+  .ring:nth-child(2) { animation-delay: 1s; }
+  .ring:nth-child(3) { animation-delay: 2s; }
+  @keyframes expand-ring {
+    0% { transform: scale(0.5); opacity: 0.6; }
+    100% { transform: scale(2.4); opacity: 0; }
+  }
+
+  .home-content {
+    position: relative;
+    z-index: 10;
+    padding: 0 28px;
+    text-align: center;
+  }
+
+  .logo-label {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--green);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    opacity: 0.8;
+  }
+
+  .home-title {
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 36px;
+    line-height: 1.1;
+    margin-bottom: 12px;
+    background: linear-gradient(135deg, #ffffff 0%, var(--green) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .home-sub {
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 300;
+    line-height: 1.5;
+    margin-bottom: 36px;
+  }
+
+  .btn-primary {
+    width: 100%;
+    padding: 18px;
+    background: var(--green);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius);
+    font-family: var(--font-body);
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.15s, box-shadow 0.3s;
+    box-shadow: 0 0 32px var(--green-glow);
+  }
+  .btn-primary:active { transform: scale(0.97); }
+  .btn-primary::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent, rgba(255,255,255,0.15), transparent);
+    transform: translateX(-100%);
+    animation: shimmer 3s ease infinite 1s;
+  }
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    30%,100% { transform: translateX(100%); }
+  }
+
+  .stats-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-chip {
+    flex: 1;
+    background: var(--green-dim);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 8px;
+    text-align: center;
+  }
+  .stat-chip .val {
+    font-family: var(--font-mono);
+    font-size: 18px;
+    color: var(--green);
+    display: block;
+  }
+  .stat-chip .lbl {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 2px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  /* ══════════════════════════════════════
+     PANTALLA 2 — MAPA
+  ══════════════════════════════════════ */
+  #screen-map {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .topbar {
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+    background: var(--bg);
+    z-index: 50;
+  }
+  .btn-back {
+    width: 36px; height: 36px;
+    background: var(--green-dim);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    color: var(--green);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .topbar-title {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--text);
+    flex: 1;
+  }
+  .topbar-badge {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    background: var(--green-dim);
+    border: 1px solid var(--border);
+    color: var(--green);
+    padding: 4px 8px;
+    border-radius: 6px;
+  }
+
+  /* MAP AREA */
+  .map-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    margin: 0 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+
+  #mapCanvas {
+    width: 100%; height: 100%;
+    cursor: crosshair;
+    display: block;
+    touch-action: none;
+  }
+
+  .map-hint {
+    position: absolute;
+    bottom: 12px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(5,13,8,0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 8px 16px;
+    font-size: 11px;
+    color: var(--text-muted);
+    white-space: nowrap;
+    transition: opacity 0.5s;
+    pointer-events: none;
+  }
+
+  .map-info-overlay {
+    position: absolute;
+    top: 12px; left: 12px;
+    display: flex; flex-direction: column; gap: 6px;
+  }
+  .map-chip {
+    background: rgba(5,13,8,0.85);
+    backdrop-filter: blur(8px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--green);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .map-chip .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--green);
+    animation: blink 1.5s ease infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  /* SIDE PANEL */
+  .side-panel {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: 16px 20px;
+    flex-shrink: 0;
+    max-height: 230px;
+    overflow: hidden;
+  }
+
+  .panel-tabs {
+    display: flex; gap: 8px; margin-bottom: 14px;
+  }
+  .tab {
+    flex: 1;
+    padding: 8px;
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text-muted);
+    font-size: 11px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.2s;
+    font-family: var(--font-body);
+  }
+  .tab.active {
+    background: var(--green-dim);
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  .info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .info-item {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 12px;
+  }
+  .info-item .il {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .info-item .iv {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--green);
+  }
+  .info-item .iv.amber { color: var(--amber); }
+  .info-item .iv.full { font-size: 11px; color: var(--text); }
+
+  .recommend-item {
+    display: flex; align-items: flex-start; gap: 8px;
+    padding: 8px 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    margin-bottom: 8px;
+    font-size: 12px;
+    line-height: 1.4;
+  }
+  .recommend-item .icon { font-size: 16px; flex-shrink: 0; }
+
+  /* ACTION BAR */
+  .action-bar {
+    padding: 12px 16px 24px;
+    display: flex;
+    gap: 10px;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+
+  .btn-secondary {
+    flex: 1;
+    padding: 14px 8px;
+    background: var(--green-dim);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    color: var(--green);
+    font-family: var(--font-body);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+    text-align: center;
+  }
+  .btn-secondary:hover { background: rgba(26,255,122,0.2); }
+  .btn-secondary.loading::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0;
+    height: 2px;
+    background: var(--green);
+    animation: loading-bar 1.8s ease-in-out;
+  }
+  @keyframes loading-bar {
+    0% { width: 0%; }
+    60% { width: 80%; }
+    100% { width: 100%; }
+  }
+
+  .btn-launch {
+    flex: 1.4;
+    padding: 14px;
+    background: var(--green);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--bg);
+    font-family: var(--font-body);
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 0 20px var(--green-glow);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+  .btn-launch:active { transform: scale(0.97); }
+  .btn-launch:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  /* ══════════════════════════════════════
+     PANTALLA 3 — VUELO
+  ══════════════════════════════════════ */
+  #screen-fly {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .fly-topbar {
+    padding: 12px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+    flex-shrink: 0;
+    background: var(--bg);
+  }
+
+  .fly-status {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .fly-status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 10px var(--green);
+    animation: blink 1s ease infinite;
+  }
+  .fly-status-text {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--green);
+  }
+
+  .fly-map-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    margin: 0 16px;
+    border-radius: var(--radius);
+    border: 1px solid var(--border);
+  }
+
+  #flyCanvas {
+    width: 100%; height: 100%;
+    display: block;
+  }
+
+  .fly-metrics {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    padding: 12px 16px;
+    flex-shrink: 0;
+  }
+
+  .metric {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 6px;
+    text-align: center;
+  }
+  .metric .mv {
+    font-family: var(--font-mono);
+    font-size: 15px;
+    color: var(--green);
+    display: block;
+  }
+  .metric .ml {
+    font-size: 9px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-top: 2px;
+  }
+
+  .progress-section {
+    padding: 0 16px 8px;
+    flex-shrink: 0;
+  }
+
+  .progress-header {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text-muted);
+    margin-bottom: 6px;
+    font-family: var(--font-mono);
+  }
+
+  .progress-track {
+    height: 6px;
+    background: var(--bg3);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--green3), var(--green));
+    border-radius: 3px;
+    transition: width 0.5s ease;
+    width: 0%;
+    box-shadow: 0 0 8px var(--green-glow);
+  }
+
+  .fly-log {
+    margin: 0 16px;
+    flex-shrink: 0;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    max-height: 80px;
+    overflow: hidden;
+  }
+  .log-entry {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-muted);
+    line-height: 1.7;
+  }
+  .log-entry .log-time { color: var(--green); margin-right: 6px; }
+  .log-entry .log-msg { }
+
+  .fly-bottom {
+    padding: 12px 16px 24px;
+    flex-shrink: 0;
+    display: flex; gap: 10px;
+  }
+
+  .btn-abort {
+    flex: 1;
+    padding: 14px;
+    background: transparent;
+    border: 1px solid var(--red);
+    border-radius: var(--radius-sm);
+    color: var(--red);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-abort:hover { background: rgba(255,68,68,0.1); }
+
+  .btn-complete {
+    flex: 2;
+    padding: 14px;
+    background: var(--green);
+    border: none;
+    border-radius: var(--radius-sm);
+    color: var(--bg);
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 0 20px var(--green-glow);
+    display: none;
+  }
+
+  /* TOAST */
+  .toast {
+    position: absolute;
+    top: 70px; left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: var(--bg2);
+    border: 1px solid var(--green);
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 13px;
+    color: var(--text);
+    opacity: 0;
+    transition: all 0.4s ease;
+    z-index: 999;
+    white-space: nowrap;
+    pointer-events: none;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4), 0 0 20px var(--green-glow);
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* PARTICLES */
+  @keyframes particle-float {
+    0% { transform: translateY(0) rotate(0deg); opacity: 0.6; }
+    100% { transform: translateY(-100px) rotate(360deg); opacity: 0; }
+  }
+
+  .nav-dots {
+    display: flex; justify-content: center; gap: 6px;
+    padding: 8px 0 4px;
+    flex-shrink: 0;
+  }
+  .nav-dot {
+    width: 4px; height: 4px; border-radius: 50%;
+    background: var(--border);
+    transition: all 0.3s;
+  }
+  .nav-dot.active { width: 16px; border-radius: 2px; background: var(--green); }
+</style>
+</head>
+<body>
+
+<div class="shell" id="shell">
+
+  <!-- Status Bar -->
+  <div class="status-bar">
+    <span id="clock" style="font-family:var(--font-mono);font-size:11px">09:41</span>
+    <div class="signal">
+      <div class="signal-bar"></div>
+      <div class="signal-bar"></div>
+      <div class="signal-bar"></div>
+      <div class="signal-bar"></div>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <!-- ══ SCREEN 1: HOME ══ -->
+  <div class="screen active" id="screen-home">
+    <div class="home-bg">
+      <canvas id="bgCanvas"></canvas>
+      <div class="home-glow"></div>
+      <div class="drone-rings">
+        <div class="ring"></div>
+        <div class="ring"></div>
+        <div class="ring"></div>
+      </div>
+      <div class="drone-hero">🛸</div>
+    </div>
+
+    <div class="home-content">
+      <div class="stats-row">
+        <div class="stat-chip">
+          <span class="val">12</span>
+          <span class="lbl">Vuelos</span>
+        </div>
+        <div class="stat-chip">
+          <span class="val">4.2ha</span>
+          <span class="lbl">Cubiertos</span>
+        </div>
+        <div class="stat-chip">
+          <span class="val">98%</span>
+          <span class="lbl">Precisión</span>
+        </div>
+      </div>
+
+      <div class="logo-label">AgroFly · IA Agrícola</div>
+      <h1 class="home-title">Cultivos inteligentes<br>desde el aire</h1>
+      <p class="home-sub">Planifica, optimiza y controla drones agrícolas con inteligencia artificial. Sin conocimientos técnicos.</p>
+
+      <button class="btn-primary" onclick="goTo('map')">
+        🚁 Iniciar Planificación
+      </button>
+    </div>
+
+    <div class="nav-dots">
+      <div class="nav-dot active"></div>
+      <div class="nav-dot"></div>
+      <div class="nav-dot"></div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN 2: MAP ══ -->
+  <div class="screen" id="screen-map">
+    <div class="topbar">
+      <div class="btn-back" onclick="goTo('home')">←</div>
+      <div class="topbar-title">Planificación de Ruta</div>
+      <div class="topbar-badge" id="pointCount">0 pts</div>
+    </div>
+
+    <div class="map-wrap">
+      <canvas id="mapCanvas"></canvas>
+
+      <div class="map-info-overlay">
+        <div class="map-chip"><div class="dot"></div>GPS LOCK · 98%</div>
+        <div class="map-chip" id="areaChip">Área: 0.0 ha</div>
+      </div>
+
+      <div class="map-hint" id="mapHint">Toca el mapa para trazar la ruta</div>
+    </div>
+
+    <!-- PANEL CULTIVO -->
+    <div class="side-panel">
+      <div class="panel-tabs">
+        <div class="tab active" onclick="switchTab('cultivo', this)">🌱 Cultivo</div>
+        <div class="tab" onclick="switchTab('ia', this)">🤖 IA</div>
+        <div class="tab" onclick="switchTab('clima', this)">☀️ Clima</div>
+      </div>
+
+      <div class="tab-content active" id="tab-cultivo">
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="il">Cultivo</div>
+            <div class="iv full">🌽 Maíz</div>
+          </div>
+          <div class="info-item">
+            <div class="il">Estado</div>
+            <div class="iv amber">⚡ Estrés hídrico</div>
+          </div>
+          <div class="info-item">
+            <div class="il">NDVI</div>
+            <div class="iv">0.68</div>
+          </div>
+          <div class="info-item">
+            <div class="il">Días ciclo</div>
+            <div class="iv">45 / 90</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-ia">
+        <div class="recommend-item">
+          <span class="icon">💧</span>
+          <span>Aplicar 8mm de riego en zona norte. Déficit hídrico detectado (-22%)</span>
+        </div>
+        <div class="recommend-item">
+          <span class="icon">🧪</span>
+          <span>Fertilización nitrogenada recomendada en 3 días (urea 46%)</span>
+        </div>
+      </div>
+
+      <div class="tab-content" id="tab-clima">
+        <div class="info-grid">
+          <div class="info-item">
+            <div class="il">Temperatura</div>
+            <div class="iv">24°C</div>
+          </div>
+          <div class="info-item">
+            <div class="il">Viento</div>
+            <div class="iv">8 km/h</div>
+          </div>
+          <div class="info-item">
+            <div class="il">Humedad</div>
+            <div class="iv">62%</div>
+          </div>
+          <div class="info-item">
+            <div class="il">Condición</div>
+            <div class="iv full">✅ Apto vuelo</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ACTION BAR -->
+    <div class="action-bar">
+      <button class="btn-secondary" id="btnOptimize" onclick="optimizeRoute()">🤖 Optimizar IA</button>
+      <button class="btn-secondary" onclick="clearRoute()" style="flex:0.6;font-size:12px">🗑 Limpiar</button>
+      <button class="btn-launch" id="btnFly" onclick="startFlight()" disabled>▶ Volar</button>
+    </div>
+
+    <div class="nav-dots">
+      <div class="nav-dot"></div>
+      <div class="nav-dot active"></div>
+      <div class="nav-dot"></div>
+    </div>
+  </div>
+
+  <!-- ══ SCREEN 3: FLIGHT ══ -->
+  <div class="screen" id="screen-fly">
+    <div class="fly-topbar">
+      <div class="fly-status">
+        <div class="fly-status-dot"></div>
+        <span class="fly-status-text" id="flyStatusText">EN VUELO</span>
+      </div>
+      <div style="font-family:var(--font-mono);font-size:11px;color:var(--text-muted)" id="flyTimer">00:00</div>
+      <div style="font-family:var(--font-mono);font-size:11px;background:var(--green-dim);border:1px solid var(--border);color:var(--green);padding:4px 8px;border-radius:6px" id="batteryLabel">🔋 94%</div>
+    </div>
+
+    <div class="fly-map-wrap">
+      <canvas id="flyCanvas"></canvas>
+    </div>
+
+    <div class="fly-metrics">
+      <div class="metric">
+        <span class="mv" id="metAlt">18m</span>
+        <span class="ml">Altitud</span>
+      </div>
+      <div class="metric">
+        <span class="mv" id="metSpd">6.2</span>
+        <span class="ml">m/s</span>
+      </div>
+      <div class="metric">
+        <span class="mv" id="metDist">0m</span>
+        <span class="ml">Dist.</span>
+      </div>
+      <div class="metric">
+        <span class="mv" id="metEta">--</span>
+        <span class="ml">ETA</span>
+      </div>
+    </div>
+
+    <div class="progress-section">
+      <div class="progress-header">
+        <span>Progreso de vuelo</span>
+        <span id="progressPct">0%</span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+    </div>
+
+    <div class="fly-log" id="flyLog">
+      <div class="log-entry"><span class="log-time">00:00</span><span class="log-msg">Sistema iniciado ✓</span></div>
+    </div>
+
+    <div class="fly-bottom">
+      <button class="btn-abort" onclick="abortFlight()">⏹ Abortar</button>
+      <button class="btn-complete" id="btnComplete" onclick="completeFlight()">✅ Finalizar misión</button>
+    </div>
+
+    <div class="nav-dots">
+      <div class="nav-dot"></div>
+      <div class="nav-dot"></div>
+      <div class="nav-dot active"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════════
+//  UTILS
+// ═══════════════════════════════════════════
+function showToast(msg, duration = 2500) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function goTo(screen) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById('screen-' + screen).classList.add('active');
+  if (screen === 'map') initMap();
+  if (screen === 'fly') initFlight();
+}
+
+function switchTab(id, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + id).classList.add('active');
+}
+
+// ─── Clock
+function updateClock() {
+  const n = new Date();
+  document.getElementById('clock').textContent =
+    String(n.getHours()).padStart(2,'0') + ':' + String(n.getMinutes()).padStart(2,'0');
+}
+updateClock();
+setInterval(updateClock, 60000);
+
+// ═══════════════════════════════════════════
+//  HOME BG — Animated grid particles
+// ═══════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('bgCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [];
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+
+  function initParticles() {
+    particles = [];
+    for (let i = 0; i < 40; i++) {
+      particles.push({
+        x: Math.random() * W,
+        y: Math.random() * H,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        r: Math.random() * 1.5 + 0.5,
+        a: Math.random()
+      });
+    }
+  }
+
+  function drawGrid() {
+    ctx.strokeStyle = 'rgba(26,255,122,0.04)';
+    ctx.lineWidth = 1;
+    const step = 40;
+    for (let x = 0; x < W; x += step) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+    }
+    for (let y = 0; y < H; y += step) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+    }
+  }
+
+  function animate() {
+    ctx.clearRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(5,13,8,0.97)';
+    ctx.fillRect(0, 0, W, H);
+    drawGrid();
+
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = `rgba(26,255,122,${p.a * 0.5})`;
+      ctx.fill();
+    });
+
+    // Connect nearby
+    particles.forEach((a, i) => {
+      particles.slice(i+1).forEach(b => {
+        const d = Math.hypot(a.x-b.x, a.y-b.y);
+        if (d < 80) {
+          ctx.strokeStyle = `rgba(26,255,122,${0.06 * (1 - d/80)})`;
+          ctx.lineWidth = 0.5;
+          ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+        }
+      });
+    });
+
+    requestAnimationFrame(animate);
+  }
+
+  resize();
+  initParticles();
+  animate();
+  window.addEventListener('resize', () => { resize(); initParticles(); });
+})();
+
+// ═══════════════════════════════════════════
+//  MAP SCREEN
+// ═══════════════════════════════════════════
+let mapCtx, mapW, mapH;
+let routePoints = [];
+let optimized = false;
+let mapInitialized = false;
+
+function initMap() {
+  const canvas = document.getElementById('mapCanvas');
+  if (!mapInitialized) {
+    mapCtx = canvas.getContext('2d');
+    mapInitialized = true;
+
+    canvas.addEventListener('click', onMapClick);
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
+      const touch = e.touches[0];
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = canvas.width / rect.width;
+      const scaleY = canvas.height / rect.height;
+      onMapClick({ offsetX: (touch.clientX - rect.left) * scaleX, offsetY: (touch.clientY - rect.top) * scaleY });
+    }, { passive: false });
+  }
+
+  resizeMap();
+  drawMap();
+}
+
+function resizeMap() {
+  const canvas = document.getElementById('mapCanvas');
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.offsetWidth;
+  canvas.height = wrap.offsetHeight;
+  mapW = canvas.width;
+  mapH = canvas.height;
+}
+
+function onMapClick(e) {
+  const x = e.offsetX || e.layerX;
+  const y = e.offsetY || e.layerY;
+  routePoints.push({ x, y });
+  optimized = false;
+  updateMapUI();
+  drawMap();
+}
+
+function updateMapUI() {
+  const n = routePoints.length;
+  document.getElementById('pointCount').textContent = n + ' pts';
+  document.getElementById('btnFly').disabled = n < 2;
+  document.getElementById('mapHint').style.opacity = n === 0 ? '1' : '0';
+
+  // Simulated area
+  if (n >= 3) {
+    const area = (n * 0.3).toFixed(1);
+    document.getElementById('areaChip').textContent = `Área: ${area} ha`;
+  }
+}
+
+function drawMap() {
+  const ctx = mapCtx;
+  const W = mapW, H = mapH;
+  if (!ctx) return;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Background terrain
+  const grad = ctx.createLinearGradient(0, 0, W, H);
+  grad.addColorStop(0, '#0c2214');
+  grad.addColorStop(0.5, '#0e2a18');
+  grad.addColorStop(1, '#0a1e12');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, W, H);
+
+  // Field patches
+  const patches = [
+    { x: 20, y: 20, w: 160, h: 120, c: 'rgba(18,60,30,0.7)' },
+    { x: 200, y: 20, w: 120, h: 80, c: 'rgba(12,50,22,0.7)' },
+    { x: 20, y: 160, w: 100, h: 100, c: 'rgba(22,70,35,0.6)' },
+    { x: 140, y: 120, w: 180, h: 140, c: 'rgba(15,55,28,0.7)' },
+  ];
+  patches.forEach(p => {
+    ctx.fillStyle = p.c;
+    ctx.beginPath();
+    ctx.roundRect(p.x, p.y, p.w, p.h, 4);
+    ctx.fill();
+  });
+
+  // Grid lines (crop rows)
+  ctx.strokeStyle = 'rgba(26,255,122,0.07)';
+  ctx.lineWidth = 1;
+  const step = 22;
+  for (let x = 0; x < W; x += step) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += step) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  if (routePoints.length === 0) return;
+
+  // Route line
+  const color = optimized ? '#ffb830' : '#1aff7a';
+  ctx.strokeStyle = optimized ? 'rgba(255,184,48,0.5)' : 'rgba(26,255,122,0.4)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash(optimized ? [] : [6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(routePoints[0].x, routePoints[0].y);
+  routePoints.forEach((p, i) => { if (i > 0) ctx.lineTo(p.x, p.y); });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Points
+  routePoints.forEach((p, i) => {
+    // Glow
+    const grd = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, 16);
+    grd.addColorStop(0, optimized ? 'rgba(255,184,48,0.3)' : 'rgba(26,255,122,0.3)');
+    grd.addColorStop(1, 'transparent');
+    ctx.fillStyle = grd;
+    ctx.beginPath(); ctx.arc(p.x, p.y, 16, 0, Math.PI*2); ctx.fill();
+
+    // Point
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, i === 0 ? 7 : 5, 0, Math.PI*2);
+    ctx.fillStyle = color;
+    ctx.fill();
+
+    // Number
+    ctx.fillStyle = '#050d08';
+    ctx.font = 'bold 9px Space Mono, monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(i + 1, p.x, p.y);
+  });
+
+  // Distance markers
+  if (routePoints.length >= 2) {
+    ctx.fillStyle = 'rgba(26,255,122,0.7)';
+    ctx.font = '9px Space Mono, monospace';
+    routePoints.forEach((p, i) => {
+      if (i === 0) return;
+      const prev = routePoints[i-1];
+      const mx = (p.x + prev.x) / 2;
+      const my = (p.y + prev.y) / 2;
+      const d = Math.round(Math.hypot(p.x - prev.x, p.y - prev.y) * 0.8);
+      ctx.fillText(d + 'm', mx + 4, my - 6);
+    });
+  }
+}
+
+function optimizeRoute() {
+  if (routePoints.length < 2) {
+    showToast('⚠️ Traza al menos 2 puntos primero');
+    return;
+  }
+
+  const btn = document.getElementById('btnOptimize');
+  btn.classList.add('loading');
+  btn.textContent = '⏳ Analizando...';
+  btn.disabled = true;
+
+  showToast('🤖 IA optimizando ruta...');
+
+  setTimeout(() => {
+    // Simulate optimization: sort by angle from centroid
+    const cx = routePoints.reduce((s, p) => s + p.x, 0) / routePoints.length;
+    const cy = routePoints.reduce((s, p) => s + p.y, 0) / routePoints.length;
+    routePoints.sort((a, b) => Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx));
+
+    optimized = true;
+    drawMap();
+
+    btn.classList.remove('loading');
+    btn.textContent = '✅ Optimizada';
+    btn.disabled = false;
+
+    showToast('✅ Ruta optimizada: -34% de tiempo de vuelo');
+  }, 1800);
+}
+
+function clearRoute() {
+  routePoints = [];
+  optimized = false;
+  document.getElementById('btnOptimize').textContent = '🤖 Optimizar IA';
+  document.getElementById('areaChip').textContent = 'Área: 0.0 ha';
+  updateMapUI();
+  drawMap();
+}
+
+function startFlight() {
+  if (routePoints.length < 2) return;
+  goTo('fly');
+}
+
+// ═══════════════════════════════════════════
+//  FLIGHT SCREEN
+// ═══════════════════════════════════════════
+let flyCtx, flyW, flyH;
+let flyPoints = [];
+let flyProgress = 0;
+let flySegment = 0;
+let flyT = 0;
+let flyTimer = null;
+let flySeconds = 0;
+let flyTimerInterval = null;
+let dronePx = 0, dronePy = 0;
+let droneTrail = [];
+let droneAngle = 0;
+let battery = 94;
+
+const logMessages = [
+  'Sensores de posición activos ✓',
+  'Cámara multiespectral ON ✓',
+  'Bomba de aplicación lista ✓',
+  'Modo autónomo activado',
+  'Iniciando secuencia de aspersión...',
+  'Zona A cubierta — 0.8 ha',
+  'Ajuste de altitud: 18m → 20m',
+  'Detección de obstáculo: ninguno',
+  'Zona B en progreso...',
+  'Batería al 80%',
+  'Velocidad ajustada por viento lateral',
+  'Zona C cubierta — 1.6 ha',
+  'Retornando a punto origen...',
+];
+let logIdx = 0;
+
+function initFlight() {
+  const canvas = document.getElementById('flyCanvas');
+  flyCtx = canvas.getContext('2d');
+
+  const wrap = canvas.parentElement;
+  canvas.width = wrap.offsetWidth;
+  canvas.height = wrap.offsetHeight;
+  flyW = canvas.width;
+  flyH = canvas.height;
+
+  // Scale route to fly canvas
+  if (routePoints.length >= 2) {
+    const minX = Math.min(...routePoints.map(p => p.x));
+    const maxX = Math.max(...routePoints.map(p => p.x));
+    const minY = Math.min(...routePoints.map(p => p.y));
+    const maxY = Math.max(...routePoints.map(p => p.y));
+    const pad = 50;
+    const scaleX = (flyW - pad*2) / Math.max(maxX - minX, 1);
+    const scaleY = (flyH - pad*2) / Math.max(maxY - minY, 1);
+    const scale = Math.min(scaleX, scaleY, 2);
+    flyPoints = routePoints.map(p => ({
+      x: pad + (p.x - minX) * scale + (flyW - pad*2 - (maxX-minX)*scale)/2,
+      y: pad + (p.y - minY) * scale + (flyH - pad*2 - (maxY-minY)*scale)/2
+    }));
+  } else {
+    // Demo route
+    flyPoints = [
+      { x: flyW*0.15, y: flyH*0.8 },
+      { x: flyW*0.2, y: flyH*0.2 },
+      { x: flyW*0.5, y: flyH*0.15 },
+      { x: flyW*0.8, y: flyH*0.2 },
+      { x: flyW*0.85, y: flyH*0.6 },
+      { x: flyW*0.5, y: flyH*0.75 },
+    ];
+  }
+
+  dronePx = flyPoints[0].x;
+  dronePy = flyPoints[0].y;
+  droneTrail = [];
+  flySegment = 0;
+  flyT = 0;
+  flyProgress = 0;
+  flySeconds = 0;
+  battery = 94;
+  logIdx = 0;
+
+  document.getElementById('progressFill').style.width = '0%';
+  document.getElementById('progressPct').textContent = '0%';
+  document.getElementById('btnComplete').style.display = 'none';
+  document.getElementById('flyStatusText').textContent = 'EN VUELO';
+
+  drawFly();
+
+  // Start animation
+  if (flyTimer) cancelAnimationFrame(flyTimer);
+  flyTimerInterval && clearInterval(flyTimerInterval);
+
+  flyTimerInterval = setInterval(() => {
+    flySeconds++;
+    const m = String(Math.floor(flySeconds/60)).padStart(2,'0');
+    const s = String(flySeconds%60).padStart(2,'0');
+    document.getElementById('flyTimer').textContent = m + ':' + s;
+
+    battery = Math.max(battery - 0.12, 0);
+    document.getElementById('batteryLabel').textContent = '🔋 ' + Math.round(battery) + '%';
+
+    // Add log entry
+    if (logIdx < logMessages.length && flySeconds % 5 === 0) {
+      addLog(logMessages[logIdx++]);
+    }
+  }, 1000);
+
+  animateDrone();
+}
+
+function addLog(msg) {
+  const log = document.getElementById('flyLog');
+  const m = String(Math.floor(flySeconds/60)).padStart(2,'0');
+  const s = String(flySeconds%60).padStart(2,'0');
+  const div = document.createElement('div');
+  div.className = 'log-entry';
+  div.innerHTML = `<span class="log-time">${m}:${s}</span><span class="log-msg">${msg}</span>`;
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+  // Keep only last 4
+  while (log.children.length > 4) log.removeChild(log.firstChild);
+}
+
+function animateDrone() {
+  const totalSegs = flyPoints.length - 1;
+  if (flySegment >= totalSegs) {
+    // Done
+    document.getElementById('flyStatusText').textContent = 'MISIÓN COMPLETA';
+    document.getElementById('progressFill').style.width = '100%';
+    document.getElementById('progressPct').textContent = '100%';
+    document.getElementById('btnComplete').style.display = 'block';
+    clearInterval(flyTimerInterval);
+    addLog('✅ Misión completada — 2.4 ha cubiertos');
+    showToast('🎉 ¡Vuelo completado exitosamente!', 4000);
+    drawFly();
+    return;
+  }
+
+  const speed = 0.012;
+  flyT += speed;
+  if (flyT >= 1) {
+    flyT = 0;
+    flySegment++;
+    if (flySegment >= totalSegs) {
+      animateDrone(); return;
+    }
+  }
+
+  const from = flyPoints[flySegment];
+  const to = flyPoints[flySegment + 1];
+  const nx = from.x + (to.x - from.x) * flyT;
+  const ny = from.y + (to.y - from.y) * flyT;
+
+  droneAngle = Math.atan2(ny - dronePy, nx - dronePx);
+  droneTrail.push({ x: dronePx, y: dronePy });
+  if (droneTrail.length > 60) droneTrail.shift();
+
+  dronePx = nx;
+  dronePy = ny;
+
+  const overall = (flySegment + flyT) / totalSegs;
+  const pct = Math.round(overall * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+  document.getElementById('progressPct').textContent = pct + '%';
+
+  const dist = Math.round(overall * 1240);
+  document.getElementById('metDist').textContent = dist + 'm';
+  document.getElementById('metAlt').textContent = (18 + Math.sin(flyT * Math.PI) * 2).toFixed(0) + 'm';
+  document.getElementById('metSpd').textContent = (5.8 + Math.random() * 0.8).toFixed(1);
+  const eta = Math.round((1 - overall) * 120);
+  document.getElementById('metEta').textContent = eta + 's';
+
+  drawFly();
+  flyTimer = requestAnimationFrame(animateDrone);
+}
+
+function drawFly() {
+  const ctx = flyCtx;
+  const W = flyW, H = flyH;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#061510');
+  bg.addColorStop(1, '#030a06');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Field patches
+  const fp = [
+    [0.1, 0.1, 0.8, 0.8]
+  ];
+  ctx.fillStyle = 'rgba(10,40,20,0.6)';
+  ctx.beginPath();
+  ctx.roundRect(W*0.08, H*0.08, W*0.84, H*0.84, 8);
+  ctx.fill();
+
+  // Grid
+  ctx.strokeStyle = 'rgba(26,255,122,0.06)';
+  ctx.lineWidth = 0.8;
+  const step = 28;
+  for (let x = 0; x < W; x += step) {
+    ctx.beginPath(); ctx.moveTo(x,0); ctx.lineTo(x,H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += step) {
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+  }
+
+  if (flyPoints.length < 2) return;
+
+  // Route ghost
+  ctx.strokeStyle = 'rgba(26,255,122,0.15)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 6]);
+  ctx.beginPath();
+  ctx.moveTo(flyPoints[0].x, flyPoints[0].y);
+  flyPoints.forEach((p, i) => { if (i > 0) ctx.lineTo(p.x, p.y); });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Waypoints
+  flyPoints.forEach((p, i) => {
+    const done = i <= flySegment;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 4, 0, Math.PI*2);
+    ctx.fillStyle = done ? 'rgba(26,255,122,0.9)' : 'rgba(26,255,122,0.25)';
+    ctx.fill();
+  });
+
+  // Trail spray effect
+  droneTrail.forEach((p, i) => {
+    const a = (i / droneTrail.length) * 0.25;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, 2.5, 0, Math.PI*2);
+    ctx.fillStyle = `rgba(13,204,96,${a})`;
+    ctx.fill();
+
+    // Spray dots
+    if (i % 4 === 0) {
+      for (let j = 0; j < 3; j++) {
+        ctx.beginPath();
+        const sx = p.x + (Math.random() - 0.5) * 14;
+        const sy = p.y + (Math.random() - 0.5) * 14;
+        ctx.arc(sx, sy, 1, 0, Math.PI*2);
+        ctx.fillStyle = `rgba(100,220,150,${a * 0.4})`;
+        ctx.fill();
+      }
+    }
+  });
+
+  // Drone
+  ctx.save();
+  ctx.translate(dronePx, dronePy);
+  ctx.rotate(droneAngle + Math.PI / 2);
+
+  // Drone shadow
+  ctx.shadowColor = 'rgba(26,255,122,0.6)';
+  ctx.shadowBlur = 20;
+
+  // Body
+  ctx.fillStyle = '#1aff7a';
+  ctx.beginPath();
+  ctx.roundRect(-8, -10, 16, 20, 3);
+  ctx.fill();
+
+  // Arms
+  ctx.shadowBlur = 0;
+  ctx.strokeStyle = 'rgba(26,255,122,0.7)';
+  ctx.lineWidth = 2;
+  [[-10,-10],[10,-10],[-10,10],[10,10]].forEach(([dx, dy]) => {
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(dx, dy); ctx.stroke();
+    // Rotors
+    ctx.beginPath();
+    ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(26,255,122,0.4)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+  });
+  ctx.restore();
+
+  // Glow halo
+  const grd = ctx.createRadialGradient(dronePx, dronePy, 0, dronePx, dronePy, 30);
+  grd.addColorStop(0, 'rgba(26,255,122,0.15)');
+  grd.addColorStop(1, 'transparent');
+  ctx.fillStyle = grd;
+  ctx.beginPath(); ctx.arc(dronePx, dronePy, 30, 0, Math.PI*2); ctx.fill();
+
+  // Scanning line
+  const scanY = dronePy + Math.sin(Date.now() * 0.003) * 20;
+  ctx.strokeStyle = 'rgba(26,255,122,0.12)';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(dronePx - 40, scanY);
+  ctx.lineTo(dronePx + 40, scanY);
+  ctx.stroke();
+}
+
+function abortFlight() {
+  cancelAnimationFrame(flyTimer);
+  clearInterval(flyTimerInterval);
+  showToast('⚠️ Vuelo abortado — Dron retornando');
+  setTimeout(() => goTo('map'), 2000);
+}
+
+function completeFlight() {
+  showToast('🌱 Misión guardada — 2.4 ha tratados');
+  setTimeout(() => {
+    clearRoute();
+    goTo('home');
+  }, 2000);
+}
+</script>
+</body>
+</html>
